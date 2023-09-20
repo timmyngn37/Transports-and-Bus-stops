@@ -1,0 +1,166 @@
+---
+title: "air quality and air stations"
+author: "Nguyen Huynh Quang Huy"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidymodels)
+library(glmnet)
+library(knitr)
+library(tidyverse)
+library(plotly)
+library(ggplot2)
+library(forcats)
+library(forecast)
+library(fpp3)
+library(DT)
+library(lubridate)
+library(crosstalk)
+library(here)
+library("writexl")
+library("readxl")
+library("gplots")
+library("tidyverse")
+library("leaflet")
+library("leaflet.extras")
+library("gridExtra")
+library ("rmarkdown")
+```
+
+
+```{r}
+air_quality_Nov2017df <- read.csv("C:\\Users\\HP\\Downloads\\drive-download-20230916T014840Z-001\\air_quality_Nov2017.csv")
+head(air_quality_Nov2017df)
+```
+```{r}
+air_stations_Nov2017df <- read.csv("C:\\Users\\HP\\Downloads\\drive-download-20230916T014840Z-001\\air_stations_Nov2017.csv")
+head(air_stations_Nov2017df)
+```
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Density plot - Air quality measures (November 2018)
+plot5 <- air_quality_Nov2017df %>%
+  gather(Measure, Value, c(7, 10, 13)) %>%
+  ggplot(aes(x=Value, fill=Measure)) +
+  geom_density(alpha=0.5, show.legend=FALSE) +
+  theme_bw() +
+  labs(x=expression(mu*g/m^3), y="Density", 
+       title="Density plot - Air quality measures (Nov. 2018)")
+
+# Histogram - Air quality measures (November 2018)
+plot6 <- air_quality_Nov2017df %>%
+  gather(Measure, Value, c(7, 10, 13)) %>%
+  ggplot(aes(x=Value, fill=Measure)) +
+  geom_histogram(stat="count") +
+  labs(x=expression(mu*g/m^3), y="Count", 
+       title="Histogram - Air quality measures (Nov. 2018)") +
+  theme_bw() + 
+  theme(legend.title=element_blank(),
+        legend.justification=c(0.99, 0.99), legend.position=c(0.99, 0.99)) +
+  scale_fill_discrete(breaks=c("NO2.Value", "O3.Value", "PM10.Value"),
+                         labels=c(expression(NO[2]~"1h"~(mu*g/m^3)), 
+                                  expression(O[3]~"1h"~(mu*g/m^3)),
+                                  expression(PM[10]~"24h"~(mu*g/m^3))))
+
+# Subplot
+grid.arrange(plot5, plot6, ncol=1)
+```
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Histogram - Nitrogen Dioxide NO2 (November 2018)
+plot7 <- air_quality_Nov2017df %>%
+  gather(Measure, Value, c(7, 10, 13)) %>%
+  filter(Measure=="NO2.Value") %>%
+  ggplot(aes(x=Value)) +
+  geom_rect(aes(xmin=0, xmax=90, ymin=-Inf, ymax=Inf), fill="darkolivegreen3", alpha=0.01) +
+  annotate('text', x=70, y=100, label="Good~quality", parse=TRUE, size=2.5) +
+  annotate('text', x=70, y=90, label=expression("0-90"~mu*g/m^3), parse=TRUE, size=2.5) +
+  geom_rect(aes(xmin=90, xmax=120, ymin=-Inf, ymax=Inf), fill="goldenrod3", alpha=0.01) +
+  annotate('text', x=105, y=100, label="Moderate~quality", parse=TRUE, size=2.5) +
+  annotate('text', x=105, y=90, label=expression("91-200"~mu*g/m^3), parse=TRUE, size=2.5) +
+  geom_histogram(stat="count") +
+  labs(x=expression(mu*g/m^3), y="Count", title=expression(Nitrogen~Dioxide~NO[2]~(Nov.~2018))) +
+  theme_bw() 
+
+# Histogram - Ozone O3 (November 2018)
+plot8 <- air_quality_Nov2017df %>%
+  gather(Measure, Value, c(7, 10, 13)) %>%
+  filter(Measure=="O3.Value") %>%
+  ggplot(aes(x=Value)) +
+  geom_rect(aes(xmin=0, xmax=100, ymin=-Inf, ymax=Inf), fill="darkolivegreen3", alpha=0.01) +
+  annotate('text', x=70, y=210, label="Good~quality", parse=TRUE, size=2.5) +
+  annotate('text', x=70, y=187, label=expression("0-100"~mu*g/m^3), parse=TRUE, size=2.5) +
+  geom_histogram(stat="count") +
+  labs(x=expression(mu*g/m^3), y="Count", title=expression(Ozone~O[3]~(Nov.~2018))) +
+  theme_bw() 
+
+# Histogram - Particulate Matter PM10 (November 2018)
+plot9 <- air_quality_Nov2017df %>%
+  gather(Measure, Value, c(7, 10, 13)) %>%
+  filter(Measure=="PM10.Value") %>%
+  ggplot(aes(x=Value)) +
+  geom_rect(aes(xmin=0, xmax=35, ymin=-Inf, ymax=Inf), fill="darkolivegreen3", alpha=0.01) +
+  annotate('text', x=27, y=200, label="Good~quality", parse=TRUE, size=2.5) +
+  annotate('text', x=27, y=180, label=expression("0-35"~mu*g/m^3), parse=TRUE, size=2.5) +
+  geom_rect(aes(xmin=35, xmax=50, ymin=-Inf, ymax=Inf), fill="goldenrod3", alpha=0.01) +
+  annotate('text', x=42, y=200, label="Moderate~quality", parse=TRUE, size=2.5) +
+  annotate('text', x=42, y=180, label=expression("36-50"~mu*g/m^3), parse=TRUE, size=2.5) +
+  geom_histogram(stat="count") +
+  labs(x=expression(mu*g/m^3), y="Count", title=expression(Particulate~Matter~PM[10]~(Nov.~2018))) +
+  theme_bw() 
+
+# Subplot
+grid.arrange(plot7, plot8, plot9, layout_matrix=rbind(c(1,1,2,2),
+                                                      c(NA,3,3,NA)))
+```
+
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Map
+leaflet() %>%
+  
+  # addTiles()
+  addTiles(group="OSM") %>%
+  addProviderTiles("OpenStreetMap.BlackAndWhite", group="BlackAndWhite") %>%
+  addProviderTiles("Esri", group="Esri") %>%
+  
+  # Extras
+  # addSearchOSM() %>%
+  # addReverseSearchOSM() %>%
+  addResetMapButton() %>%
+ 
+  # Add marker layer for each sector with corresponding group name
+  addMarkers(data=air_stations_Nov2017df, popup=~paste0("<b>", Station,"</b>","<br/>", Ubication)) %>%
+  
+   # Add layer controls for base groups
+  addLayersControl(baseGroups=c("OSM", "BlackAndWhite", "Esri"))
+```
+
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Mean values by station (November 2018)
+air_quality_Nov2017df %>%
+  group_by(Station) %>%
+  summarise(Mean.NO2=mean(na.omit(NO2.Value)),
+            Mean.O3=mean(na.omit(O3.Value)),
+            Mean.PM10=mean(na.omit(PM10.Value))) %>%
+  gather(Measure, Value, 2:4) %>%
+  mutate(Station=factor(Station, levels=c("Barcelona - Sants", "Barcelona - Poblenou",
+                                          "Barcelona - Ciutadella", "Barcelona - Palau Reial",
+                                          "Barcelona - Vall Hebron", "Barcelona - Observ Fabra", 
+                                          "Barcelona - Gràcia", "Barcelona - Eixample"))) %>%
+  ggplot(aes(x=Station, y=Value, fill=Measure)) +
+  geom_col(position=position_stack(reverse=FALSE),  colour="black") + 
+  geom_text(aes(label=round(Value, digits=2), group=Measure), position=position_stack(vjust=0.5)) +
+  theme_bw() +
+  coord_flip() +
+  labs(x="Station", y=expression(mu*g/m^3), title="Mean values by station (Nov. 2018)") +
+  theme(legend.title=element_blank(),
+        legend.position="bottom") +
+  scale_fill_discrete(breaks=c("Mean.NO2", "Mean.O3", "Mean.PM10"),
+                      labels=c(expression(NO[2]), 
+                               expression(O[3]),
+                               expression(PM[10])))
+```

@@ -1,0 +1,237 @@
+---
+title: "accidents_2017"
+author: "Nguyen Huynh Quang Huy"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidymodels)
+library(glmnet)
+library(knitr)
+library(tidyverse)
+library(plotly)
+library(ggplot2)
+library(forcats)
+library(forecast)
+library(fpp3)
+library(DT)
+library(lubridate)
+library(crosstalk)
+library(here)
+library("writexl")
+library("readxl")
+library("gplots")
+library("tidyverse")
+library("leaflet")
+library("leaflet.extras")
+library("gridExtra")
+library ("rmarkdown")
+```
+
+```{r}
+accidents_2017df <- read.csv("C:\\Users\\HP\\Downloads\\drive-download-20230916T014840Z-001\\accidents_2017.csv")
+head(accidents_2017df)
+```
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Map
+leaflet() %>%
+  
+  # addTiles()
+  addTiles(group="OSM") %>%
+  addProviderTiles("OpenStreetMap.BlackAndWhite", group="BlackAndWhite") %>%
+  addProviderTiles("Esri", group="Esri") %>%
+  
+  # Extras
+  # addSearchOSM() %>%
+  # addReverseSearchOSM() %>%
+  addResetMapButton() %>%
+ 
+  # Add marker layer for each sector with corresponding group name
+  
+  # Morning
+  addCircleMarkers(data=accidents_2017df %>% filter(Part.of.the.day=="Morning"), color="green", 
+                   group="Morning", radius=5, popup=~paste0("<b>", District.Name,"</b>", "<br/>", 
+                                                            "Month: ", Month, "<br/>",
+                                                            "Weekday: ", Weekday, "<br/>",
+                                                            "Hour: ", Hour)) %>%
+                                    
+  # Afternoon                                                         
+  addCircleMarkers(data=accidents_2017df %>% filter(Part.of.the.day=="Afternoon"), color="orange", 
+                   group="Afternoon", radius=5, popup=~paste0("<b>", District.Name,"</b>", "<br/>", 
+                                                              "Month: ", Month, "<br/>",
+                                                              "Weekday: ", Weekday, "<br/>",
+                                                              "Hour: ", Hour)) %>%
+  
+  # Night                                                           
+  addCircleMarkers(data=accidents_2017df  %>% filter(Part.of.the.day=="Night"), color="blue", 
+                   group="Night", radius=5, popup=~paste0("<b>", District.Name,"</b>", "<br/>", 
+                                                          "Month: ", Month, "<br/>",
+                                                          "Weekday: ", Weekday, "<br/>",
+                                                          "Hour: ", Hour)) %>%
+  
+  # Add layer controls for base and overlay groups
+  addLayersControl(overlayGroups=c("Morning", "Afternoon", "Night"),
+                   baseGroups=c("OSM", "BlackAndWhite", "Esri")) %>%
+  
+  # Add legend
+  addLegend(position="bottomleft",
+            colors=c("green", "orange", "blue"), 
+            labels=c("Morning", "Afternoon", "Night"))
+```
+
+
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Accidents by month (2017)
+plot10 <- accidents_2017df %>%
+  count(Month, Part.of.the.day) %>% 
+  mutate(Month=factor(Month, levels=c("December", "November", "October", "September",
+                                      "August", "July", "June", "May",
+                                      "April", "March", "February", "January"))) %>%
+  ggplot(aes(x=Month, y=n, fill=Part.of.the.day)) + 
+  geom_col(position=position_stack(reverse=FALSE),  colour="black") +
+  geom_text(aes(label=n, group=Part.of.the.day), position=position_stack(vjust=0.5)) +
+  scale_fill_manual(values=c("sienna1", "darkolivegreen1", "slateblue1")) +
+  labs(x="Month", y="Accidents", title="Accidents by month (2017)") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank()) +
+  coord_flip()
+
+# Accidents (%)
+plot11 <- accidents_2017df %>%
+  count(Part.of.the.day) %>%
+  mutate(Percentage=paste0(round(n/sum(n)*100, 2), "%")) %>%
+  ggplot(aes(x=factor(1), y=n, fill=Part.of.the.day)) + 
+  geom_bar(stat="identity", width=1, size=1, color="white", show.legend=FALSE) +
+  geom_text(aes(label=Percentage), position=position_stack(vjust=0.5)) +
+  coord_polar(theta="y") +
+  labs(title="Accidents (%)") +
+  scale_fill_manual(values=c("sienna1", "darkolivegreen1", "slateblue1")) +
+  theme_void() +
+  theme(plot.title=element_text(hjust=0.5))
+
+# Subplot
+grid.arrange(plot10, plot11, layout_matrix=rbind(c(1, 1, 2),
+                                                 c(1, 1, 2)))
+```
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Accidents by weekday (2017)
+accidents_2017df %>%
+  count(Weekday, Part.of.the.day) %>% 
+  mutate(Weekday=factor(Weekday, levels=c("Sunday", "Saturday", "Friday", "Thursday",
+                                          "Wednesday", "Tuesday", "Monday"))) %>%
+  ggplot(aes(x=Weekday, y=n, fill=Part.of.the.day)) + 
+  geom_col(position=position_stack(reverse=FALSE),  colour="black") +
+  geom_text(aes(label=n, group=Part.of.the.day), position=position_stack(vjust=0.5)) +
+  scale_fill_manual(values=c("sienna1", "darkolivegreen1", "slateblue1")) +
+  labs(x="Weekday", y="Accidents", title="Accidents by weekday (2017)") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank()) +
+  coord_flip()
+```
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Victims by district
+accidents_2017df %>%
+  group_by(District.Name, Part.of.the.day) %>%
+  summarise(Victims=sum(Victims)) %>%
+  filter(District.Name!="Unknown") %>%
+  ggplot(aes(x=reorder(District.Name, Victims, sum), y=Victims, fill=Part.of.the.day)) + 
+  geom_col(position=position_stack(reverse=FALSE),  colour="black") +
+  geom_text(aes(label=Victims, group=Part.of.the.day), position=position_stack(vjust=0.5)) +
+  scale_fill_manual(values=c("sienna1", "darkolivegreen1", "slateblue1")) +
+  labs(x="District name", y="Victims", title="Victims by district (2017)") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank()) +
+  coord_flip()
+```
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Accidents by hour (2017)
+accidents_2017df %>%
+  mutate(Weekday=factor(Weekday, levels=c("Monday", "Tuesday", "Wednesday", "Thursday",
+                                          "Friday", "Saturday", "Sunday"))) %>%
+  ggplot(aes(x=Hour, fill=Weekday)) +
+  geom_histogram(stat="count") +
+  labs(y="Accidents", title="Accidents by hour (2017)") +
+  theme_bw() + 
+  theme(legend.title=element_blank())
+```
+
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Victims by district (2017)
+accidents_2017df %>%
+  group_by(District.Name, Month) %>%
+  summarise(Victims=sum(Victims)) %>%
+  filter(District.Name!="Unknown") %>% 
+  mutate(Month=factor(Month, levels=c("January", "February", "March", 
+                                      "April", "May", "June",
+                                      "July", "August", "September", 
+                                      "October", "November", "December"))) %>%
+  ggplot(aes(x=Month, y=Victims, group=District.Name)) +
+  geom_line(aes(colour=District.Name), size=1) +
+  geom_point(aes(colour=District.Name), size=1) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) +
+  labs(x="Month", y="District name", title="Victims by district (2017)") +
+  scale_color_discrete(name="District name")
+```
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Injuries by district (2017)
+accidents_2017df %>%
+  filter(District.Name!="Unknown") %>%
+  rename(`Mild injuries`=Mild.injuries,
+         `Serious injuries`=Serious.injuries) %>%
+  gather(Injuries, Values, 10:11) %>%
+  group_by(District.Name, Injuries) %>%
+  summarize(Count=sum(Values)) %>%
+  ggplot(aes(x=reorder(District.Name, Count, sum), y=Count, fill=Injuries)) + 
+  geom_col(position=position_stack(reverse=FALSE),  colour="black") +
+  geom_text(aes(label=Count, group=Injuries), position=position_stack(vjust=0.5)) +
+  scale_fill_manual(values=c("sienna1", "darkolivegreen1", "slateblue1")) +
+  labs(x="District name", y="Injuries", title="Injuries by district (2017)") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank()) +
+  coord_flip()
+```
+
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Histogram - Mild injuries (2017) 
+plot12 <- accidents_2017df %>%
+  ggplot(aes(x=Mild.injuries)) +
+  geom_histogram(stat="count", fill="cadetblue1") +
+  labs(x="Mild injuries", y="Frequency", title="Mild injuries (2017)") +
+  theme_bw() 
+
+# Histogram - Serious injuries (2017) 
+plot13 <- accidents_2017df %>%
+  ggplot(aes(x=Serious.injuries)) +
+  geom_histogram(stat="count", fill="coral1") +
+  labs(x="Serious injuries", y="Frequency", title="Serious injuries (2017)") +
+  theme_bw() 
+
+# Histogram - Vehicles involved (2017) 
+plot14 <- accidents_2017df %>%
+  ggplot(aes(x=Vehicles.involved)) +
+  geom_histogram(stat="count", fill="lightgreen") +
+  labs(x="Vehicles involved", y="Frequency", title="Vehicles involded (2017)") +
+  theme_bw() 
+
+# Histogram - Victims (2017) 
+plot15 <- accidents_2017df %>%
+  ggplot(aes(x=Victims)) +
+  geom_histogram(stat="count", fill="plum2") +
+  labs(x="Victims", y="Frequency", title="Victims (2017)") +
+  theme_bw() 
+
+# Subplot
+grid.arrange(plot12, plot13, plot14, plot15, layout_matrix=rbind(c(1, 2),
+                                                                 c(3, 4)))
+```
+

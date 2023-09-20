@@ -1,0 +1,117 @@
+---
+title: "Population"
+author: "Nguyen Huynh Quang Huy"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidymodels)
+library(glmnet)
+library(knitr)
+library(tidyverse)
+library(plotly)
+library(ggplot2)
+library(forcats)
+library(forecast)
+library(fpp3)
+library(DT)
+library(lubridate)
+library(crosstalk)
+library(here)
+library("writexl")
+library("readxl")
+library("gplots")
+library("tidyverse")
+library("leaflet")
+library("leaflet.extras")
+library("gridExtra")
+library ("rmarkdown")
+```
+
+```{r}
+population_df <- read.csv("C:\\Users\\HP\\Downloads\\drive-download-20230916T014840Z-001\\population.csv")
+head(population_df)
+```
+
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Population by year 
+population_df %>%
+  group_by(Year, Gender) %>%
+  summarise(count=sum(Number)) %>%
+  mutate(percent=paste0(round((count/sum(count))*100, 2), "%")) %>%
+  ggplot(aes(x=Year, y=count)) +
+  geom_bar(stat="identity", aes(fill=Gender)) +
+  geom_text(aes(label=percent, group=Gender), position=position_stack(vjust=0.5)) +
+  scale_y_continuous(labels=comma) +
+  labs(x="Year", y="Population", title="Population by year (2013-2017)") +
+  theme_bw() 
+```
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Ordered levels
+population_df$Age <- ordered(population_df$Age, levels=c("0-4", "5-9", "10-14", "15-19",
+                                                   "20-24", "25-29", "30-34", "35-39",
+                                                   "40-44", "45-49", "50-54", "55-59",
+                                                   "60-64", "65-69", "70-74", "75-79",
+                                                   "80-84", "85-89", "90-94", ">=95"))
+
+
+# Population by age (2017)
+population2017 <- population_df %>%
+  filter(Year=="2017")
+  
+ggplot(data=population2017, aes(x=Age, fill=Gender)) +
+  geom_bar(data=filter(population2017, Gender=="Female"), aes(y=Number), stat="identity") + 
+  geom_bar(data=filter(population2017, Gender=="Male"), aes(y=Number*(-1)), stat="identity") +
+  scale_y_continuous(breaks=seq(-100000, 100000, 20000), 
+                     labels=comma(abs(seq(-100000, 100000, 20000)))) + 
+  labs(x="Age", y="Population", title="Population by age (2017)") +
+  coord_flip() +
+  theme_bw() 
+```
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Population by district (2017)
+population_df %>%
+  filter(Year=="2017") %>%
+  group_by(District.Name, Gender) %>%
+  summarise(count=sum(Number)) %>%
+  mutate(percent=paste0(round((count/sum(count))*100, 2), "%")) %>%
+  ggplot(aes(x=reorder(District.Name, count), y=count)) +
+  geom_bar(stat="identity", aes(fill=Gender)) +
+  geom_text(aes(label=percent, group=Gender), position=position_stack(vjust=0.5)) +
+  scale_y_continuous(breaks=seq(0, 300000, 100000), labels=comma) +
+  labs(x="District name", y="Population", title="Population by district (2017)") +
+  theme_bw() + 
+  coord_flip()
+```
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Population by neighbordhood - Top 15 neighbordhoods (2017)
+population_df %>%
+  filter(Year=="2017") %>%
+  filter(Neighborhood.Name %in% c("la Nova Esquerra de l'Eixample", "Sant Andreu",
+                                  "la Sagrada Família", "la Vila de Gràcia",
+                                  "Sant Gervasi - Galvany", "el Raval", "les Corts",
+                                  "la Dreta de l'Eixample", "l'Antiga Esquerra de l'Eixample",
+                                  "Sants", "el Poble Sec", "Sant Antoni", 
+                                  "el Camp de l'Arpa del Clot", "el Guinardó", 
+                                  "el Camp d'en Grassot i Gràcia Nova")) %>%
+  group_by(Neighborhood.Name, Gender) %>%
+  summarise(count=sum(Number)) %>%
+  mutate(percent=paste0(round((count/sum(count))*100, 2), "%")) %>%
+  ggplot(aes(x=reorder(Neighborhood.Name, count), y=count)) +
+  geom_bar(stat="identity", aes(fill=Gender)) +
+  geom_text(aes(label=percent, group=Gender), position=position_stack(vjust=0.5)) +
+  scale_y_continuous(breaks=seq(0, 60000, 20000), labels=comma) +
+  labs(x="Neighbordhood name", y="Population", title="Population by neighbordhood (2017)") +
+  theme_bw() + 
+  coord_flip()
+```
+
