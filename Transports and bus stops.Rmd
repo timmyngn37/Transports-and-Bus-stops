@@ -1,0 +1,215 @@
+---
+title: "Transports and bus stops"
+author: "Nguyen Huynh Quang Huy"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidymodels)
+library(glmnet)
+library(knitr)
+library(tidyverse)
+library(plotly)
+library(ggplot2)
+library(forcats)
+library(forecast)
+library(fpp3)
+library(DT)
+library(lubridate)
+library(crosstalk)
+library(here)
+library("writexl")
+library("readxl")
+library("gplots")
+library("tidyverse")
+library("leaflet")
+library("leaflet.extras")
+library("gridExtra")
+library ("rmarkdown")
+```
+
+```{r}
+transports_df <- read.csv("C:\\Users\\HP\\Downloads\\drive-download-20230916T014840Z-001\\transports.csv")
+head(transports_df)
+```
+```{r}
+bus_stops_df <- read.csv("C:\\Users\\HP\\Downloads\\drive-download-20230916T014840Z-001\\bus_stops.csv")
+head(bus_stops_df)
+```
+
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Map
+leaflet() %>%
+  
+  # addTiles()
+  addTiles(group="OSM") %>%
+  addProviderTiles("OpenStreetMap.BlackAndWhite", group="BlackAndWhite") %>%
+  addProviderTiles("Esri", group="Esri") %>%
+  
+  # Extras
+  # addSearchOSM() %>%
+  # addReverseSearchOSM() %>%
+  addResetMapButton() %>%
+ 
+  # Add marker layer for each sector with corresponding group name
+  addCircleMarkers(data=transports_df %>% filter(Transport=="Underground"), color="blue", 
+                   group="Underground", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+                   
+  addCircleMarkers(data=transports_df %>% filter(Transport=="Tram"), color="yellow", 
+                   group="Tram", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+                   
+  addCircleMarkers(data=transports_df %>% filter(Transport=="Railway (FGC)"), color="green", 
+                   group="Railway (FGC)", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+                   
+  addCircleMarkers(data=transports_df %>% filter(Transport=="Maritime station"), color="cyan", 
+                   group="Maritime station", 
+                   radius=5, popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+                   
+  addCircleMarkers(data=transports_df %>% filter(Transport=="Cableway"), color="pink", 
+                   group="Cableway", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+                   
+  addCircleMarkers(data=transports_df %>% filter(Transport=="RENFE"), color="red", 
+                   group="RENFE", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+                   
+  addCircleMarkers(data=transports_df %>% filter(Transport=="Airport train"), color="orange", 
+                   group="Airport train", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+                   
+  addCircleMarkers(data=transports_df %>% filter(Transport=="Funicular"), color="purple", 
+                   group="Funicular", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Station)) %>%
+  
+  # Add layer controls for base and overlay groups
+  addLayersControl(overlayGroups=c("Underground", "Cableway", "Funicular", "Maritime station",
+                                   "Railway (FGC)", "RENFE", "Airport train", "Tram"),
+                   baseGroups=c("OSM", "BlackAndWhite", "Esri")) %>%
+  
+  # Add legend
+  addLegend(position="bottomleft",
+            colors=c("blue", "pink", "purple", "cyan", "green", "red", "orange", "yellow"), 
+            labels=c("Underground", "Cableway", "Funicular", "Maritime station",
+                     "Railway (FGC)", "RENFE", "Airport train", "Tram"))
+```
+
+
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Stations by district
+plot1 <- transports_df %>%
+  filter(District.Name!="") %>%
+  count(District.Name, Transport) %>% 
+  ggplot(aes(x=reorder(District.Name, n, sum), y=n, fill=Transport)) + 
+  geom_col(position=position_stack(reverse=FALSE),  colour="black") + 
+  scale_fill_manual(values=c("sienna1", "pink", "slateblue1", "lightcyan1", 
+                             "darkolivegreen1", "firebrick1", "goldenrod2", "dodgerblue1")) +
+  labs(x="District name", y="Stations", title="Stations by district") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank()) +
+  coord_flip()
+
+# Stations 
+plot2 <- transports_df %>%
+  filter(District.Name!="") %>%
+  count(Transport) %>%
+  ggplot(aes(x=factor(1), y=n, fill=Transport)) + 
+  geom_bar(stat="identity", width=1, size=1, color="white", show.legend=FALSE) +
+  coord_polar(theta="y") +
+  labs(title="Stations") +
+  scale_fill_manual(values=c("sienna1", "pink", "slateblue1", "lightcyan1", 
+                             "darkolivegreen1", "firebrick1", "goldenrod2", "dodgerblue1")) +
+  theme_void() +
+  theme(plot.title=element_text(hjust=0.5))
+
+# Subplot
+grid.arrange(plot1, plot2, layout_matrix=rbind(c(1, 1, 2),
+                                               c(1, 1, 2)))
+```
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Map
+leaflet() %>%
+  
+  # addTiles()
+  addTiles(group="OSM") %>%
+  addProviderTiles("OpenStreetMap.BlackAndWhite", group="BlackAndWhite") %>%
+  addProviderTiles("Esri", group="Esri") %>%
+  
+  # Extras
+  # addSearchOSM() %>%
+  # addReverseSearchOSM() %>%
+  addResetMapButton() %>%
+ 
+  # Add marker layer for each sector with corresponding group name
+  addCircleMarkers(data=bus_stops_df %>% filter(Transport=="Day bus stop"), color="yellow", 
+                   group="Day bus stop", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Bus.Stop)) %>%
+                   
+  addCircleMarkers(data=bus_stops_df %>% filter(Transport=="Night bus stop"), color="blue", 
+                   group="Night bus stop", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Bus.Stop)) %>%
+                   
+  addCircleMarkers(data=bus_stops_df %>% filter(Transport=="Airport bus stop"), color="red", 
+                   group="Airport bus stop", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Bus.Stop)) %>%
+                   
+  addCircleMarkers(data=bus_stops_df %>% filter(Transport=="Bus station"), color="green", 
+                   group="Bus station", radius=5, 
+                   popup=~paste0("<b>", Transport,"</b>","<br/>", Bus.Stop)) %>%
+  
+  # Add layer controls for base and overlay groups
+  addLayersControl(overlayGroups=c("Day bus stop", "Night bus stop", "Airport bus stop", "Bus station"),
+                   baseGroups=c("OSM", "BlackAndWhite", "Esri")) %>%
+  
+  # Add legend
+  addLegend(position="bottomleft",
+            colors=c("yellow", "blue", "red", "green"), 
+            labels=c("Day bus stop", "Night bus stop", "Airport bus stop", "Bus station"))
+```
+
+```{r message=FALSE, warning=FALSE, fig.align='center'}
+# Bus stops by district
+plot3 <- bus_stops_df %>%
+  filter(District.Name!="") %>%
+  count(District.Name, Transport) %>% 
+  ggplot(aes(x=reorder(District.Name, n, sum), y=n, fill=Transport)) + 
+  geom_col(position=position_stack(reverse=FALSE),  colour="black") + 
+  scale_fill_manual(values=c("firebrick1", "darkolivegreen1",
+                             "goldenrod2", "slateblue1")) +
+  labs(x="District name", y="Bus stops", title="Bus stops by district") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank()) +
+  coord_flip()
+
+# Bus stops (%)
+plot4 <- bus_stops_df %>%
+  filter(District.Name!="") %>%
+  count(Transport) %>%
+  mutate(Percentage=paste0(round(n/sum(n)*100, 2), "%")) %>%
+  ggplot(aes(x=factor(1), y=n, fill=Transport)) + 
+  geom_bar(stat="identity", width=1, size=1, color="white", show.legend=FALSE) +
+  geom_text(aes(x=c(1, 1.2, 1, 1), label=Percentage), position=position_stack(vjust=0.5)) +
+  coord_polar(theta="y") +
+  labs(title="Bus stops (%)") +
+  scale_fill_manual(values=c("firebrick1", "darkolivegreen1",
+                             "goldenrod2", "slateblue1")) +
+  theme_void() +
+  theme(plot.title=element_text(hjust=0.5))
+
+# Subplot
+grid.arrange(plot3, plot4, layout_matrix=rbind(c(1, 1, 2),
+                                               c(1, 1, 2)))
+```
+
